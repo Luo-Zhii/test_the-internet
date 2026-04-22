@@ -11,16 +11,13 @@ class TestDragAndDrop(unittest.TestCase):
         self.driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()))
         self.driver.maximize_window()
         self.wait = WebDriverWait(self.driver, 10)
+        self.url = "https://the-internet.herokuapp.com/drag_and_drop"
 
     def tearDown(self):
         self.driver.quit()
 
-    def test_drag_and_drop_html5(self):
-        self.driver.get("https://the-internet.herokuapp.com/drag_and_drop")
-        
-        source = self.wait.until(EC.presence_of_element_located((By.ID, "column-a")))
-        target = self.wait.until(EC.presence_of_element_located((By.ID, "column-b")))
-        
+    def helper_html5_drag_and_drop(self, source, target):
+        """Helper to bypass WebDriver's poor HTML5 drag/drop ActionChain support by injecting dynamic JS."""
         js_drag_and_drop = """
         function createEvent(typeOfEvent) {
             var event = document.createEvent("CustomEvent");
@@ -57,12 +54,34 @@ class TestDragAndDrop(unittest.TestCase):
         var destination = arguments[1];
         simulateHTML5DragAndDrop(source, destination);
         """
-        
         self.driver.execute_script(js_drag_and_drop, source, target)
+
+    def test_tc1_drag_a_to_b(self):
+        """TC1: Drag Block A over to Block B and verify swap."""
+        self.driver.get(self.url)
+        col_a = self.wait.until(EC.presence_of_element_located((By.ID, "column-a")))
+        col_b = self.wait.until(EC.presence_of_element_located((By.ID, "column-b")))
         
-        # Verify swap
-        self.assertEqual(source.text, "B")
-        self.assertEqual(target.text, "A")
+        self.assertEqual(col_a.text, "A")
+        self.assertEqual(col_b.text, "B")
+        
+        self.helper_html5_drag_and_drop(col_a, col_b)
+        
+        self.assertEqual(col_a.text, "B", "Block A visual text should be swapped to B.")
+        self.assertEqual(col_b.text, "A", "Block B visual text should be swapped to A.")
+
+    def test_tc2_drag_b_to_a(self):
+        """TC2: Drag Block B over to Block A back to back."""
+        self.driver.get(self.url)
+        col_a = self.wait.until(EC.presence_of_element_located((By.ID, "column-a")))
+        col_b = self.wait.until(EC.presence_of_element_located((By.ID, "column-b")))
+        
+        # Do it twice
+        self.helper_html5_drag_and_drop(col_a, col_b)
+        self.helper_html5_drag_and_drop(col_b, col_a)
+        
+        self.assertEqual(col_a.text, "A", "Block A visual text should revert to A.")
+        self.assertEqual(col_b.text, "B", "Block B visual text should revert to B.")
 
 if __name__ == "__main__":
     unittest.main()

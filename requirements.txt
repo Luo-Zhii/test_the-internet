@@ -2,3 +2,5 @@ selenium
 requests
 urllib3
 pyautogui
+pytest-rerunfailures
+pytest-timeout

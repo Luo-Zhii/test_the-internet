@@ -12,34 +12,59 @@ class TestBrokenImages(unittest.TestCase):
         self.driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()))
         self.driver.maximize_window()
         self.wait = WebDriverWait(self.driver, 10)
+        self.url = "https://the-internet.herokuapp.com/broken_images"
 
     def tearDown(self):
         self.driver.quit()
 
-    def test_broken_images(self):
-        self.driver.get("https://the-internet.herokuapp.com/broken_images")
-        
-        # Wait for images to be present
+    def helper_evaluate_image(self, img_element):
+        """Helper rule to determine if an individual image element is broken via HTTP request."""
+        src = img_element.get_attribute('src')
+        if not src:
+            return False # Missing source counts as broken or missing
+        try:
+            response = requests.get(src, stream=True, timeout=5)
+            # A valid image must return status 200
+            return response.status_code == 200
+        except:
+            return False
+
+    def test_tc1_verify_total_images_on_page(self):
+        """TC1: Verify correct total count of images on page to ensure script doesn't silently pass if DOM changes."""
+        self.driver.get(self.url)
         self.wait.until(EC.presence_of_all_elements_located((By.TAG_NAME, "img")))
-        image_list = self.driver.find_elements(By.TAG_NAME, "img")
+        images = self.driver.find_elements(By.TAG_NAME, "img")
         
-        broken_images = []
-        for img in image_list:
-            src = img.get_attribute('src')
-            if not src:
-                continue
+        # Herokuapp broken images page has 4 images including avatar
+        self.assertTrue(len(images) >= 3, "There should be at least 3 images present on the page layout.")
+
+    def test_tc2_identify_broken_images(self):
+        """TC2: Explicitly identify images that return non-200 profiles."""
+        self.driver.get(self.url)
+        self.wait.until(EC.presence_of_all_elements_located((By.TAG_NAME, "img")))
+        images = self.driver.find_elements(By.TAG_NAME, "img")
+        
+        broken_imgs = []
+        for img in images:
+            if not self.helper_evaluate_image(img):
+                broken_imgs.append(img.get_attribute('outerHTML'))
                 
-            try:
-                response = requests.get(src, stream=True, timeout=5)
-                if response.status_code != 200:
-                    broken_images.append(img.get_attribute('outerHTML'))
-            except Exception as e:
-                broken_images.append(f"{img.get_attribute('outerHTML')} (Error: {str(e)})")
+        # The intent is to verify exactly *which* images or how many fail reliably
+        # On Herokuapp there are 2 broken profile pics out of 4 total imgs.
+        self.assertEqual(len(broken_imgs), 2, "There are exactly two broken images on the Heroku app demo.")
+
+    def test_tc3_identify_valid_images(self):
+        """TC3: Ensure the script correctly recognizes 200 OK valid images such as the footer avatar."""
+        self.driver.get(self.url)
+        self.wait.until(EC.presence_of_all_elements_located((By.TAG_NAME, "img")))
+        images = self.driver.find_elements(By.TAG_NAME, "img")
         
-        # Verify no images are broken
-        # Note: The herokuapp page intentionally has broken images.
-        # This test will document them if they exist.
-        self.assertEqual(len(broken_images), 2, f"Found {len(broken_images)} broken images: {broken_images}")
+        valid_imgs = []
+        for img in images:
+            if self.helper_evaluate_image(img):
+                valid_imgs.append(img.get_attribute('outerHTML'))
+                
+        self.assertTrue(len(valid_imgs) >= 1, "There should be at least one valid image on the page.")
 
 if __name__ == "__main__":
     unittest.main()

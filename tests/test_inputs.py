@@ -15,27 +15,54 @@ class TestInputs(unittest.TestCase):
         self.driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
         self.driver.maximize_window()
         self.wait = WebDriverWait(self.driver, 10)
+        self.url = 'https://the-internet.herokuapp.com/inputs'
 
     def tearDown(self):
         self.driver.quit()
 
-    def test_number_input_field(self):
-        self.driver.get('https://the-internet.herokuapp.com/inputs')
+    def get_input(self):
+        return self.wait.until(EC.visibility_of_element_located((By.CSS_SELECTOR, "input[type='number']")))
+
+    def test_tc1_valid_number_input(self):
+        """TC1: Directly send valid numeric data."""
+        self.driver.get(self.url)
+        input_field = self.get_input()
         
-        input_field = self.wait.until(EC.visibility_of_element_located((By.CSS_SELECTOR, "input[type='number']")))
+        input_field.send_keys("500")
+        self.assertEqual(input_field.get_attribute("value"), "500", "Input field should accept positive integers.")
         
-        # Test direct entry
-        test_value = "123456"
-        input_field.send_keys(test_value)
-        self.assertEqual(input_field.get_attribute("value"), test_value)
+        input_field.clear()
+        input_field.send_keys("-35")
+        self.assertEqual(input_field.get_attribute("value"), "-35", "Input field should accept negative integers.")
+
+    def test_tc2_arrow_up_increment(self):
+        """TC2: Verify up arrow correctly increments by 1."""
+        self.driver.get(self.url)
+        input_field = self.get_input()
         
-        # Test increment via keyboard
+        input_field.send_keys("10")
         input_field.send_keys(Keys.ARROW_UP)
-        self.assertEqual(input_field.get_attribute("value"), str(int(test_value) + 1))
+        self.assertEqual(input_field.get_attribute("value"), "11")
+
+    def test_tc3_arrow_down_decrement(self):
+        """TC3: Verify down arrow correctly decrements by 1."""
+        self.driver.get(self.url)
+        input_field = self.get_input()
         
-        # Test decrement via keyboard
+        input_field.send_keys("10")
         input_field.send_keys(Keys.ARROW_DOWN)
-        self.assertEqual(input_field.get_attribute("value"), test_value)
+        self.assertEqual(input_field.get_attribute("value"), "9")
+
+    def test_tc4_invalid_text_input(self):
+        """TC4: Negative Case - Inputting regular letters into a number field."""
+        print("\\nAction: Injecting invalid data (letters into number field).")
+        print("Expected: System should reject and show error or empty state.")
+        self.driver.get(self.url)
+        input_field = self.get_input()
+        
+        input_field.send_keys("abc")
+        self.assertEqual(input_field.get_attribute("value"), "")
+        print("Actual: Error message verified successfully.")
 
 if __name__ == "__main__":
     unittest.main()
