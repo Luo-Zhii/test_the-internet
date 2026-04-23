@@ -1,376 +1,528 @@
-# Master Test Case Specification
-### Project: The Internet – Selenium Automation Suite
-**Prepared by:** QA Automation Team  
-**Date:** 2026-04-22  
-**Total Test Files:** 27 | **Total Test Cases:** 77+
+# MASTER AUTOMATION TEST CASES
+
+This document provides a comprehensive overview of the automated test cases implemented for the "The Internet" (Herokuapp) Selenium suite. Every test case is reverse-engineered from the active Python test scripts under the `tests/` directory.
 
 ---
 
-## 1. Executive Summary
+## Feature: A/B Testing
+Validates that the page header correctly reflects A/B variants or opt-out status.
+> **File:** test_ab_testing.py
 
-This document is the single-source-of-truth specification for the full Selenium end-to-end automation suite targeting [The Internet (Herokuapp)](https://the-internet.herokuapp.com). The framework is built on:
-
-| Strategic Pillar | Implementation Detail |
-| :--- | :--- |
-| **Framework** | Python `unittest.TestCase` with `webdriver_manager` for automated driver lifecycle management |
-| **Wait Strategy** | Exclusively **Explicit Waits** (`WebDriverWait` + `expected_conditions`). `time.sleep()` is **forbidden**. |
-| **Negative Testing** | ISTQB Black-Box techniques: Boundary Value Analysis, Error Guessing, and Security Injection (SQLi/XSS) |
-| **Security Coverage** | XSS payloads (`<script>alert('XSS')</script>`), SQL Injection (`' OR 1=1 --`), and special-character fuzzing |
-| **Race Condition Handling** | `staleness_of` checks on DOM elements during page reloads to prevent flaky assertions |
-| **Geolocation Mocking** | Chrome DevTools Protocol (CDP) via `execute_cdp_cmd` to override OS-level prompts with deterministic coordinates |
-| **HTML5 Drag & Drop** | JavaScript injection (`execute_script`) to bypass WebDriver's native HTML5 drag-and-drop limitations |
-| **DRY Architecture** | Internal `helper_*` methods inside each test class to centralize repetitive actions |
-| **Observability** | All negative test paths emit `print()` traces (Action / Expected / Actual) for deterministic CI log review |
+| Test Case ID | Scenario Description | Input Data / Actions | Expected Result | Severity/Priority | Testing Technique |
+| --- | --- | --- | --- | --- | --- |
+| test_ab_testing_header_variation_tc1 | Happy Path: Header variation check | `get(BASE_URL)`, `visibility_of_element_located(By.TAG_NAME, "h3")` | Header text is in `VALID_HEADERS` list. | High | **EP** |
+| test_ab_testing_paragraph_presence_tc2 | Happy Path: UI Info paragraph check | `get(BASE_URL)`, `visibility_of_element_located((By.XPATH, "//p[contains(text(),'Also known as...')]"))` | Informational paragraph is visible. | Medium | **EP** |
+| test_ab_testing_optout_cookie_tc3 | Robustness: Opt-out cookie functionality | `add_cookie({'name': 'optimizelyOptOut', 'value': 'true'})`, `refresh()` | Header text becomes "No A/B Test". | High | **State Transition** |
 
 ---
 
 ## Feature: Add / Remove Elements
+Tests the dynamic addition and removal of action buttons in the DOM.
+> **File:** test_add_remove_elements.py
 
-> **File:** `test_add_remove_elements.py`
-
-| Test Case ID | Scenario Description | Input Data / Actions | Expected Result | Severity/Priority |
-| :--- | :--- | :--- | :--- | :--- |
-| TC_ARE_01 | Add a single element and verify it appears in the DOM | Click "Add Element" once | Exactly **1** Delete button visible | High |
-| TC_ARE_02 | Add then immediately remove a single element | Click Add → Click Delete | DOM returns to **0** Delete buttons; staleness confirmed | High |
-| TC_ARE_03 | Add multiple elements in rapid succession | Click "Add Element" **5 times** | Exactly **5** Delete buttons present | Medium |
-| TC_ARE_04 | Remove all elements one-by-one (empty-state boundary) | Add 3 → Delete each with `staleness_of` confirmation | **0** Delete buttons remain; DOM fully clean | High |
+| Test Case ID | Scenario Description | Input Data / Actions | Expected Result | Severity/Priority | Testing Technique |
+| --- | --- | --- | --- | --- | --- |
+| test_tc1_add_single_element | Happy Path: Add one element | Click `//button[text()='Add Element']` | One `added-manually` button appears. | High | **EP** |
+| test_tc2_remove_single_element | Happy Path: Remove one element | Click `added-manually` button, wait for `staleness_of` | Zero `added-manually` buttons remain. | High | **State Transition** |
+| test_tc3_add_multiple_elements | Happy Path: Stress dynamic addition | Loop 5 times: click 'Add Element' | Exactly 5 delete buttons are present. | Medium | **BVA** |
+| test_tc4_remove_all_elements_dynamically | Happy Path: Full removal loop | Add 3 elements, loop 3 times: click 'Delete' | DOM is cleared of all added elements. | High | **BVA** |
 
 ---
 
 ## Feature: Basic Authentication
+Verifies successful authentication via URL-embedded credentials.
+> **File:** test_basic_auth.py
 
-> **File:** `test_basic_auth.py`
-
-| Test Case ID | Scenario Description | Input Data / Actions | Expected Result | Severity/Priority |
-| :--- | :--- | :--- | :--- | :--- |
-| TC_BA_01 | HTTP Basic Auth via URL-embedded credentials | URL: `https://admin:admin@...` | Page displays: *"Congratulations! You must have the proper credentials."* | CRITICAL |
+| Test Case ID | Scenario Description | Input Data / Actions | Expected Result | Severity/Priority | Testing Technique |
+| --- | --- | --- | --- | --- | --- |
+| test_basic_auth_success | Happy Path: Successful credential login | `get('https://admin:admin@host/basic_auth')` | Page contains "Congratulations!". | Critical | **EP** |
 
 ---
 
 ## Feature: Broken Images
+Detects broken image assets via HTTP status code verification.
+> **File:** test_broken_images.py
 
-> **File:** `test_broken_images.py`
+| Test Case ID | Scenario Description | Input Data / Actions | Expected Result | Severity/Priority | Testing Technique |
+| --- | --- | --- | --- | --- | --- |
+| test_tc1_verify_total_images_on_page | Happy Path: Layout audit | `find_elements(By.TAG_NAME, "img")` | At least 3 images are present. | Low | **BVA** |
+| test_tc2_identify_broken_images | Happy Path: Broken asset detection | `requests.get(img_src)` for all images | Exactly 2 images return non-200 codes. | High | **EP** |
+| test_tc3_identify_valid_images | Happy Path: Valid asset verification | `requests.get(img_src)` check for avatar | At least one image returns 200 OK. | Medium | **EP** |
 
-| Test Case ID | Scenario Description | Input Data / Actions | Expected Result | Severity/Priority |
-| :--- | :--- | :--- | :--- | :--- |
-| TC_BI_01 | Verify the total number of images rendered on page | Locate all `<img>` tags | At least **3** images present | Medium |
-| TC_BI_02 | Identify broken images via HTTP response probing | HTTP GET each `src`; check status code | Exactly **2** images return non-200 (broken) | High |
-| TC_BI_03 | Confirm at least one valid (200 OK) image exists | HTTP GET each `src`; filter 200 responses | At least **1** valid image confirmed | Medium |
+---
+
+## Feature: Challenging DOM
+Tests interaction with dynamically generated elements and data extraction.
+> **File:** test_challenging_dom.py
+
+| Test Case ID | Scenario Description | Input Data / Actions | Expected Result | Severity/Priority | Testing Technique |
+| --- | --- | --- | --- | --- --- |
+| test_dynamic_buttons_tc1 | Happy Path: Locate alert button | Click `.button.alert` (no ID used) | Button remains visible after DOM refresh. | High | **EP** |
+| test_table_ep_mid_tc2 | Happy Path: Row 5 data extraction | Locate row 5 via XPath | Row contains valid EP data. | Medium | **EP** |
+| test_table_bva_min_tc3 | Happy Path: Row 1 data extraction | Locate row 1 via XPath | Row contains valid BVA min data. | Medium | **BVA** |
+| test_table_bva_max_tc4 | Happy Path: Row 10 data extraction | Locate row 10 via XPath | Row contains valid BVA max data. | Medium | **BVA** |
+| test_table_negative_out_of_bounds_tc5 | Sad Path: Out of bounds check | Attempt to find row 11 (2s timeout) | `TimeoutException`/`NoSuchElementException` caught. | Low | **Negative Testing** |
+| test_canvas_verification_tc6 | Happy Path: Canvas rendering | `presence_of_element_located((By.CSS_SELECTOR, "canvas#canvas"))` | Canvas is visible on UI. | Medium | **EP** |
+| test_table_action_links_tc7 | Happy Path: Action link interaction | Click 'edit' and 'delete' in row 3 | URL hash updates to `#edit` and `#delete`. | High | **EP** |
 
 ---
 
 ## Feature: Checkboxes
+Verifies boolean state management of HTML input elements.
+> **File:** test_checkbox.py
 
-> **File:** `test_checkbox.py`
-
-| Test Case ID | Scenario Description | Input Data / Actions | Expected Result | Severity/Priority |
-| :--- | :--- | :--- | :--- | :--- |
-| TC_CB_01 | Validate default checked/unchecked state on load | Navigate to page; read `is_selected()` | CB1 = **unchecked**, CB2 = **checked** | High |
-| TC_CB_02 | Check the initially unchecked checkbox | Click Checkbox 1 if unchecked | CB1 transitions to **checked** state | Medium |
-| TC_CB_03 | Uncheck the initially checked checkbox | Click Checkbox 2 if checked | CB2 transitions to **unchecked** state | Medium |
-| TC_CB_04 | Stress toggle both checkboxes through multiple state flips | Click CB1 twice; Click CB2 twice | Final states revert to original (CB1=unchecked, CB2=checked) | Medium |
+| Test Case ID | Scenario Description | Input Data / Actions | Expected Result | Severity/Priority | Testing Technique |
+| --- | --- | --- | --- | --- | --- |
+| test_tc1_default_state_validation | Happy Path: Default state audit | `is_selected()` on both checkboxes | CB1 is unchecked, CB2 is checked. | Medium | **BVA** |
+| test_tc2_check_first_checkbox | Happy Path: Check action | Click CB1 if `not is_selected()` | `is_selected()` returns True. | High | **EP** |
+| test_tc3_uncheck_second_checkbox | Happy Path: Uncheck action | Click CB2 if `is_selected()` | `is_selected()` returns False. | High | **EP** |
+| test_tc4_toggle_both_checkboxes | Robustness: Toggle stress test | Sequential clicks on CB1 & CB2 | States flip correctly across multiple clicks. | Medium | **EP** |
 
 ---
 
 ## Feature: Context Menu
+Validates JavaScript alert triggers on right-click actions.
+> **File:** test_context_menu.py
 
-> **File:** `test_context_menu.py`
+| Test Case ID | Scenario Description | Input Data / Actions | Expected Result | Severity/Priority | Testing Technique |
+| --- | --- | --- | --- | --- | --- |
+| test_tc1_context_menu_success | Happy Path: Trigger menu | `ActionChains.context_click(hot_spot)` | JS Alert "You selected a context menu" appears. | High | **State Transition** |
+| test_tc2_left_click_ignores_menu | Sad Path: Invalid trigger check | `ActionChains.click(hot_spot)` | No alert appears (2s short-wait). | Medium | **Negative Testing** |
 
-| Test Case ID | Scenario Description | Input Data / Actions | Expected Result | Severity/Priority |
-| :--- | :--- | :--- | :--- | :--- |
-| TC_CM_01 | Right-click the hotspot to trigger JS alert | `ActionChains.context_click()` on `#hot-spot` | Alert appears with text: *"You selected a context menu"* | High |
-| TC_CM_02 | Negative: Verify left-click does NOT trigger the alert | `ActionChains.click()` on `#hot-spot` | **No alert** appears within 2-second fast-fail window | Medium |
+---
+
+## Feature: Digest Authentication
+Handles challenge-response authentication with URL encoding.
+> **File:** test_digest_auth.py
+
+| Test Case ID | Scenario Description | Input Data / Actions | Expected Result | Severity/Priority | Testing Technique |
+| --- | --- | --- | --- | --- | --- |
+| test_digest_auth_happy_path_tc1 | Happy Path: Valid login | `get("https://admin:admin@host/digest_auth")` | "Congratulations!" message visible. | Critical | **EP** |
+| test_digest_auth_invalid_creds_tc2 | Sad Path: Wrong password | `get("https://admin:wrong@host/digest_auth")` | Success message is absent from body. | High | **Negative Testing** |
+| test_digest_auth_unauthorized_tc3 | Sad Path: No credentials | `get("https://host/digest_auth")` | Success message is absent from body. | High | **Negative Testing** |
+| test_digest_auth_special_chars_tc4 | Robustness: URL encoding verification | `urllib.parse.quote("admin@123")` | '@' becomes '%40'; login rejected correctly. | Medium | **BVA** |
 
 ---
 
 ## Feature: Disappearing Elements
+Tests for volatile DOM elements caused by A/B variation logic.
+> **File:** test_disappearing_elements.py
 
-> **File:** `test_disappearing_elements.py`
-
-| Test Case ID | Scenario Description | Input Data / Actions | Expected Result | Severity/Priority |
-| :--- | :--- | :--- | :--- | :--- |
-| TC_DE_01 | Verify permanent navigation links always render | Check for Home, About, Contact, Portfolio via `LINK_TEXT` | All 4 links are displayed | High |
-| TC_DE_02 | Verify randomly disappearing "Gallery" link appears within 5 refreshes | Refresh up to 5× until Gallery link visible; click it | Gallery link eventually appears; clicking leads to expected 404 page | Medium |
+| Test Case ID | Scenario Description | Input Data / Actions | Expected Result | Severity/Priority | Testing Technique |
+| --- | --- | --- | --- | --- | --- |
+| test_tc1_verify_permanent_links | Happy Path: Static link audit | Find "Home", "About", "Contact Us", "Portfolio" | All 4 permanent links are present. | Medium | **EP** |
+| test_tc2_gallery_appears_on_refresh | Happy Path: Volatile element detection | Refresh up to 5 times for "Gallery" link | "Gallery" appears and leads to 404 handler. | High | **BVA** |
 
 ---
 
 ## Feature: Drag and Drop
+Simulates HTML5 drag and drop via JavaScript injection.
+> **File:** test_drag_and_drop.py
 
-> **File:** `test_drag_and_drop.py`
-
-| Test Case ID | Scenario Description | Input Data / Actions | Expected Result | Severity/Priority |
-| :--- | :--- | :--- | :--- | :--- |
-| TC_DD_01 | Drag Block A onto Block B and verify swap | JS-injected `simulateHTML5DragAndDrop(colA → colB)` | Column A shows **"B"**, Column B shows **"A"** | High |
-| TC_DD_02 | Double drag to revert blocks to original positions | JS drag A→B, then B→A | Columns revert: A shows **"A"**, B shows **"B"** | High |
+| Test Case ID | Scenario Description | Input Data / Actions | Expected Result | Severity/Priority | Testing Technique |
+| --- | --- | --- | --- | --- | --- |
+| test_tc1_drag_a_to_b | Happy Path: Swap blocks | Execute JS helper to drag A to B | Block A text is "B", Block B text is "A". | High | **State Transition** |
+| test_tc2_drag_b_to_a | Happy Path: Reverse swap | Drag A to B, then B to A | Blocks revert to "A" and "B" respectively. | High | **State Transition** |
 
 ---
 
 ## Feature: Dropdown
+Validates standard HTML Select element interactions.
+> **File:** test_dropdown.py
 
-> **File:** `test_dropdown.py`
-
-| Test Case ID | Scenario Description | Input Data / Actions | Expected Result | Severity/Priority |
-| :--- | :--- | :--- | :--- | :--- |
-| TC_DD_01 | Validate default placeholder state | Read `first_selected_option` on load | Text = *"Please select an option"*; option is **disabled** | High |
-| TC_DD_02 | Select Option 1 by index | `select_by_index(1)` | Selected option text = **"Option 1"** | Medium |
-| TC_DD_03 | Select Option 2 by visible text | `select_by_visible_text("Option 2")` | Selected option text = **"Option 2"** | Medium |
-| TC_DD_04 | Switch between options to confirm override | `select_by_value("1")` then `select_by_value("2")` | Selection correctly overrides from Option 1 → Option 2 | Medium |
+| Test Case ID | Scenario Description | Input Data / Actions | Expected Result | Severity/Priority | Testing Technique |
+| --- | --- | --- | --- | --- | --- |
+| test_tc1_default_placeholder | Happy Path: Placeholder audit | `dropdown.first_selected_option` | Text is "Please select an option"; disabled. | Low | **BVA** |
+| test_tc2_select_option_1 | Happy Path: Select by index | `dropdown.select_by_index(1)` | Selected text is "Option 1". | High | **EP** |
+| test_tc3_select_option_2 | Happy Path: Select by text | `dropdown.select_by_visible_text("Option 2")` | Selected text is "Option 2". | High | **EP** |
+| test_tc4_switch_between_options | Happy Path: Selection override | Select "1", then select "2" | Final selection is "Option 2". | Medium | **State Transition** |
 
 ---
 
 ## Feature: Dynamic Content
+Detects randomization of images and text blocks.
+> **File:** test_dynamic_content.py
 
-> **File:** `test_dynamic_content.py`
-
-| Test Case ID | Scenario Description | Input Data / Actions | Expected Result | Severity/Priority |
-| :--- | :--- | :--- | :--- | :--- |
-| TC_DC_01 | Verify 3 rows of images and text always render | Navigate to base URL; count rows | Exactly **3 images** and **3 text blocks** present | High |
-| TC_DC_02 | Confirm content randomizes on page refresh | Refresh up to 3×; compare `src`/text captures | At least one image **or** text block changes across refreshes | Medium |
-| TC_DC_03 | Verify `?with_content=static` locks first two rows | Load static URL; refresh; compare first 2 rows | First 2 image+text pairs remain **identical**; 3rd row is free to change | High |
+| Test Case ID | Scenario Description | Input Data / Actions | Expected Result | Severity/Priority | Testing Technique |
+| --- | --- | --- | --- | --- | --- |
+| test_tc1_content_structure_intact | Happy Path: Layout verification | `find_elements(By.CSS_SELECTOR, ".row")` | Exactly 3 images and 3 text blocks render. | Medium | **BVA** |
+| test_tc2_content_changes_on_refresh | Happy Path: Randomization check | Capture state, refresh, compare | At least some content changes after refresh. | High | **EP** |
+| test_tc3_static_content_parameter | Happy Path: Static mode check | `get(url + "?with_content=static")`, refresh | First two rows remain identical on refresh. | Medium | **State Transition** |
 
 ---
 
 ## Feature: Dynamic Controls
+Manages asynchronous element addition/removal and state toggling.
+> **File:** test_dynamic_controls.py
 
-> **File:** `test_dynamic_controls.py`
-
-| Test Case ID | Scenario Description | Input Data / Actions | Expected Result | Severity/Priority |
-| :--- | :--- | :--- | :--- | :--- |
-| TC_DY_01 | Remove checkbox from DOM via button click | Click "Remove"; wait `staleness_of` | `#message` = *"It's gone!"*; `#checkbox` count = 0 | High |
-| TC_DY_02 | Re-add checkbox after removal | Remove → then click "Add" | `#message` = *"It's back!"*; `#checkbox` is visible | High |
-| TC_DY_03 | Enable a disabled input field | Click "Enable"; wait `element_to_be_clickable` | `#message` = *"It's enabled!"*; `input.is_enabled()` = True | High |
-| TC_DY_04 | Disable a re-enabled input field | Enable → click "Disable"; wait `lambda is_enabled == False` | `#message` = *"It's disabled!"*; `input.is_enabled()` = False | High |
+| Test Case ID | Scenario Description | Input Data / Actions | Expected Result | Severity/Priority | Testing Technique |
+| --- | --- | --- | --- | --- | --- |
+| test_tc1_checkbox_removal | Happy Path: Remove checkbox | Click "Remove", `wait.until(staleness_of)` | Message "It's gone!" appears; CB removed. | High | **State Transition** |
+| test_tc2_checkbox_addition | Happy Path: Add checkbox | Click "Add", wait for presence | Message "It's back!" appears; CB present. | High | **State Transition** |
+| test_tc3_input_enable | Happy Path: Enable input | Click "Enable", wait for clickable | Message "It's enabled!"; `is_enabled()` is True. | High | **State Transition** |
+| test_tc4_input_disable | Happy Path: Disable input | Click "Disable", wait for condition | Message "It's disabled!"; `is_enabled()` is False. | High | **State Transition** |
 
 ---
 
-## Feature: Entry Ad (Modal)
+## Feature: Dynamic Loading
+Validates UX for elements becoming visible after AJAX or rendering delays.
+> **File:** test_dynamic_loading.py
 
-> **File:** `test_entry_ad.py`
+| Test Case ID | Scenario Description | Input Data / Actions | Expected Result | Severity/Priority | Testing Technique |
+| --- | --- | --- | --- | --- | --- |
+| test_hidden_element_ep_tc1 | Happy Path: Hidden element (Ex 1) | Click Start, wait for loading invis | "Hello World!" becomes visible. | High | **EP** |
+| test_rendered_element_ep_tc2 | Happy Path: Rendered element (Ex 2) | Click Start, wait for presence | "Hello World!" added to DOM and visible. | High | **EP** |
+| test_double_click_sad_path_tc3 | Robustness: Double-click start | Rapidly click Start twice | Page recovers gracefully and shows content. | Medium | **BVA** |
+| test_missing_element_sad_path_tc4 | Sad Path: Invalid selector | Wait for `button#wrong-id` | `TimeoutException` is correctly thrown. | Low | **Negative Testing** |
+| test_short_timeout_bva_tc5 | Robustness: BVA timing check | Wait with 0.5s timeout | `TimeoutException` (loading takes >0.5s). | Medium | **BVA** |
 
-| Test Case ID | Scenario Description | Input Data / Actions | Expected Result | Severity/Priority |
-| :--- | :--- | :--- | :--- | :--- |
-| TC_EA_01 | Close modal on initial appearance | Delete cookies → refresh → wait for modal → click close | Modal becomes **invisible** (`invisibility_of_element`) | High |
-| TC_EA_02 | Modal does NOT reappear after being closed (cookie retention) | Close modal → refresh with cookies intact; fast-fail wait (3s) | Modal remains **hidden** on subsequent visit | Medium |
-| TC_EA_03 | Modal reappears after cookies are fully cleared | Close modal → delete all cookies → refresh | Modal is **visible again** (session memory reset) | Medium |
+---
+
+## Feature: Entry Ad
+Tests modal dismissal logic using cookies for session retention.
+> **File:** test_entry_ad.py
+
+| Test Case ID | Scenario Description | Input Data / Actions | Expected Result | Severity/Priority | Testing Technique |
+| --- | --- | --- | --- | --- | --- |
+| test_tc1_close_entry_ad_modal | Happy Path: Basic dismissal | `execute_script("modal_close.click()")` | Modal ID='modal' becomes invisible. | High | **State Transition** |
+| test_tc2_ad_does_not_reappear_on_refresh | Happy Path: Cookie retention | Dismiss ad, refresh | Modal does not reappear (3s short-wait). | High | **BVA** |
+| test_tc3_ad_reappears_on_cleared_cookies | Happy Path: State reset | Dismiss ad, clear cookies, refresh | Modal reappears as expected. | High | **BVA** |
+
+---
+
+## Feature: Exit Intent
+Simulates mouse movement behavior to trigger site-exit modals.
+> **File:** test_exit_intent.py
+
+| Test Case ID | Scenario Description | Input Data / Actions | Expected Result | Severity/Priority | Testing Technique |
+| --- | --- | --- | --- | --- | --- |
+| test_exit_intent_happy_path_tc1 | Happy Path: Standard trigger | Dispatch JS `mouseleave`, click Close | Modal appears with correct title, then closes. | High | **State Transition** |
+| test_exit_intent_one_time_trigger_tc2 | Happy Path: Refresh suppression | Trigger, close, attempt re-trigger | Modal does not appear a second time. | Medium | **State Transition** |
+| test_exit_intent_no_trigger_within_bounds_tc3 | Sad Path: In-page movement | Move mouse to (100, 100) via `ActionChains` | Modal stays hidden. | Medium | **BVA** |
+| test_exit_intent_overlay_blocking_tc4 | Robustness: Click interception | Trigger modal, click background link | `ElementClickInterceptedException` thrown. | High | **Negative Testing** |
 
 ---
 
 ## Feature: File Download
+Validates browser download behavior by polling the local filesystem.
+> **File:** test_file_download.py
 
-> **File:** `test_file_download.py`
-
-| Test Case ID | Scenario Description | Input Data / Actions | Expected Result | Severity/Priority |
-| :--- | :--- | :--- | :--- | :--- |
-| TC_FD_01 | Verify first available file downloads successfully | Click first download link; poll `test_downloads/` for 10s | File appears on disk without `.crdownload` extension (fully downloaded) | High |
+| Test Case ID | Scenario Description | Input Data / Actions | Expected Result | Severity/Priority | Testing Technique |
+| --- | --- | --- | --- | --- | --- |
+| test_tc1_download_success | Happy Path: Successful download | `driver.get(url)`, click first link | File is found in `test_downloads/` via polling. | High | **EP** |
 
 ---
 
 ## Feature: File Upload
+Tests local file injection and empty state error handling.
+> **File:** test_file_upload.py
 
-> **File:** `test_file_upload.py`
-
-| Test Case ID | Scenario Description | Input Data / Actions | Expected Result | Severity/Priority |
-| :--- | :--- | :--- | :--- | :--- |
-| TC_FU_01 | Upload a valid local file and confirm success | `send_keys(absolute_path_to_file)` → click Submit | Page shows *"File Uploaded!"*; uploaded filename matches input | High |
-| TC_FU_02 | **Negative:** Submit form with no file selected | Click Submit with empty file input field | Page navigates to backend error; H1 = *"Internal Server Error"* | Medium |
+| Test Case ID | Scenario Description | Input Data / Actions | Expected Result | Severity/Priority | Testing Technique |
+| --- | --- | --- | --- | --- | --- |
+| test_tc1_upload_valid_file | Happy Path: Successful upload | Send path to `file-upload`, click Submit | "File Uploaded!" success header appears. | High | **EP** |
+| test_tc2_upload_empty_submission | Sad Path: No file selected | Click Submit without input | "Internal Server Error" (500) caught. | Medium | **Negative Testing** |
 
 ---
 
 ## Feature: Floating Menu
+Ensures UI navigation remains persistent during viewport scrolling.
+> **File:** test_floating_menu.py
 
-> **File:** `test_floating_menu.py`
-
-| Test Case ID | Scenario Description | Input Data / Actions | Expected Result | Severity/Priority |
-| :--- | :--- | :--- | :--- | :--- |
-| TC_FM_01 | Verify floating menu is visible on initial page load | Navigate to page; locate `#menu` | Menu element `is_displayed()` = **True** | Medium |
-| TC_FM_02 | Menu stays visible after heavy bottom scroll | `window.scrollTo(0, scrollHeight)` via JS | `#menu` still displayed; Home and About links visible | High |
-| TC_FM_03 | Click anchor link and verify hash navigation | Click "Home" in floating menu | `current_url` contains `#home` | Medium |
+| Test Case ID | Scenario Description | Input Data / Actions | Expected Result | Severity/Priority | Testing Technique |
+| --- | --- | --- | --- | --- | --- |
+| test_tc1_menu_visible_top | Happy Path: Initial visibility | Load page | `menu.is_displayed()` is True. | Low | **BVA** |
+| test_tc2_menu_visible_on_scroll | Happy Path: Persistence on scroll | `scrollTo(0, scrollHeight)` | `menu.is_displayed()` remains True; links visible. | High | **State Transition** |
+| test_tc3_menu_anchor_links_work | Happy Path: Anchor navigation | Click 'Home' link | URL hash updates to `#home`. | Medium | **EP** |
 
 ---
 
 ## Feature: Forgot Password
+Tests form submission and server error resilience.
+> **File:** test_forgot_password.py
 
-> **File:** `test_forgot_password.py`
-
-| Test Case ID | Scenario Description | Input Data / Actions | Expected Result | Severity/Priority |
-| :--- | :--- | :--- | :--- | :--- |
-| TC_FP_01 | Submit a fully valid email address | Input: `test_user_valid@example.com` | Page confirms *"Your e-mail's been sent!"* or handles endpoint 500 gracefully | High |
-| TC_FP_02 | **Negative:** Submit blank email field | Input: `""` (empty string) | System rejects; response contains *"Internal Server Error"* | Medium |
-| TC_FP_03 | **Negative:** Submit malformed non-email string | Input: `user_without_at_symbol_or_domain` | System rejects or server-errors; response validated for error state | Medium |
+| Test Case ID | Scenario Description | Input Data / Actions | Expected Result | Severity/Priority | Testing Technique |
+| --- | --- | --- | --- | --- | --- |
+| test_tc1_valid_email_submission | Happy Path: Standard request | Input valid email, click Submit | Returns "Internal Server Error" or success text. | Medium | **EP** |
+| test_tc2_empty_email_submission | Sad Path: Blank input | Clear email field, click Submit | Returns "Internal Server Error". | Medium | **BVA** |
+| test_tc3_invalid_email_format | Sad Path: Malformed input | Input 'user_no_domain', click Submit | Returns "Internal Server Error". | Medium | **BVA** |
 
 ---
 
-## Feature: Form Authentication (Login)
+## Feature: Form Authentication
+Comprehensive validation of standard login and logout flows.
+> **File:** test_form_authentication.py
 
-> **File:** `test_form_authentication.py`
+| Test Case ID | Scenario Description | Input Data / Actions | Expected Result | Severity/Priority | Testing Technique |
+| --- | --- | --- | --- | --- | --- |
+| test_tc1_login_success | Happy Path: Successful login | tomsmith / SuperSecretPassword! | Redirect to `/secure`; success flash message. | Critical | **EP** |
+| test_tc2_invalid_password | Sad Path: Wrong password | tomsmith / wrong | Flash message: "Your password is invalid!". | High | **Negative Testing** |
+| test_tc3_invalid_username | Sad Path: Wrong username | wrong / SuperSecretPassword! | Flash message: "Your username is invalid!". | High | **Negative Testing** |
+| test_tc4_empty_credentials | Sad Path: Blank fields | "" / "" | Flash message: "Your username is invalid!". | Medium | **Negative Testing** |
+| test_tc7_logout_functionality | Happy Path: Successful logout | Login, then click Logout | Redirect back to `/login`; logout flash message. | High | **EP** |
+| test_tc8_case_sensitive_username | Sad Path: Logic check | "TomSmith" (PascalCase) | Flash message: "Your username is invalid!". | Medium | **Negative Testing** |
 
-| Test Case ID | Scenario Description | Input Data / Actions | Expected Result | Severity/Priority |
-| :--- | :--- | :--- | :--- | :--- |
-| TC_FA_01 | Happy path: valid credentials redirect to secure area | Username: `tomsmith` / Password: `SuperSecretPassword!` | URL contains `/secure`; flash = *"You logged into a secure area!"* | CRITICAL |
-| TC_FA_02 | **Negative:** Wrong password | Username: `tomsmith` / Password: `wrongpassword` | Flash = *"Your password is invalid!"* | CRITICAL |
-| TC_FA_03 | **Negative:** Wrong username | Username: `wronguser` / Password: `SuperSecretPassword!` | Flash = *"Your username is invalid!"* | CRITICAL |
-| TC_FA_04 | **Negative:** Both fields empty | Username: `""` / Password: `""` | Flash = *"Your username is invalid!"* | High |
-| TC_FA_05 | **Negative:** Valid username, empty password | Username: `tomsmith` / Password: `""` | Flash = *"Your password is invalid!"* | High |
-| TC_FA_06 | **Negative:** Empty username, valid password | Username: `""` / Password: `SuperSecretPassword!` | Flash = *"Your username is invalid!"* | High |
-| TC_FA_07 | Logout after successful login | Login → Click logout button | Flash = *"You logged out of the secure area!"*; URL = login page | CRITICAL |
-| TC_FA_08 | **Negative:** Case-sensitive username check | Username: `TomSmith` / Password: `SuperSecretPassword!` | Flash = *"Your username is invalid!"* | High |
-| TC_FA_09 | **Negative:** Case-sensitive password check | Username: `tomsmith` / Password: `supersecretpassword!` | Flash = *"Your password is invalid!"* | High |
-| TC_FA_10 | **Security:** Special characters in username (fuzzing) | Username: `!@#$%^&*` / Password: `SuperSecretPassword!` | System safely rejects; Flash = *"Your username is invalid!"* | CRITICAL |
+---
+
+## Feature: iFrame Isolation
+Validates driver context switching and isolation between single iFrames.
+> **File:** test_frame.py
+
+| Test Case ID | Scenario Description | Input Data / Actions | Expected Result | Severity/Priority | Testing Technique |
+| --- | --- | --- | --- | --- | --- |
+| test_iframe_happy_path_tc1 | Happy Path: iFrame interaction | `switch_to.frame("mce_0_ifr")`, inject text | Editor text matches injected payload. | High | **DOM Traversal / Context Isolation** |
+| test_frame_context_leak_sad_path_tc2 | Sad Path: Context leak check | While in iframe, find main page `h3` | `NoSuchElementException` is caught. | High | **DOM Traversal / Context Isolation** |
+| test_invalid_frame_access_sad_path_tc3 | Sad Path: Invalid target switch | `switch_to.frame("ghost_99")` | `NoSuchFrameException` is caught. | Medium | **Negative Testing** |
 
 ---
 
 ## Feature: Geolocation
+Tests mocking of GPS coordinates via CDP (Chrome DevTools Protocol).
+> **File:** test_geolocation.py
 
-> **File:** `test_geolocation.py`
-
-| Test Case ID | Scenario Description | Input Data / Actions | Expected Result | Severity/Priority |
-| :--- | :--- | :--- | :--- | :--- |
-| TC_GEO_01 | CDP-mocked coordinates populate lat/long fields | CDP mock: Lat=`21.0285`, Long=`105.8542` (Hanoi, VN) → Click *"Where am I?"* | `#lat-value` and `#long-value` contain valid float numbers | High |
-| TC_GEO_02 | Google Maps link is generated with correct mocked latitude | Same CDP mock → Click button → inspect `#map-link a[href]` | Href contains *"google"* and the exact mocked latitude value | High |
+| Test Case ID | Scenario Description | Input Data / Actions | Expected Result | Severity/Priority | Testing Technique |
+| --- | --- | --- | --- | --- | --- |
+| test_tc1_geolocation_reveal_coordinates | Happy Path: Coordinate population | `execute_cdp_cmd("Emulation.setGeolocationOverride", ...)` | Latitude/Longitude fields contain valid floats. | High | **State Transition** |
+| test_tc2_geolocation_map_link | Happy Path: Dynamic map URL | Click "Where am I?", find `map-link` | URL contains "google" and the correct latitude. | Medium | **EP** |
 
 ---
 
 ## Feature: Horizontal Slider
+Validates input range precision and boundary constraints.
+> **File:** test_horizontal_slider.py
 
-> **File:** `test_horizontal_slider.py`
-
-| Test Case ID | Scenario Description | Input Data / Actions | Expected Result | Severity/Priority |
-| :--- | :--- | :--- | :--- | :--- |
-| TC_HS_01 | Slider increments by 0.5 per ARROW_RIGHT keypress | Click slider → press `ARROW_RIGHT` twice | Values: `0.5` → `1.0` | Medium |
-| TC_HS_02 | Boundary max: slider cannot exceed 5 | Press `ARROW_RIGHT` 15× | `#range` = **"5"** (hard maximum) | High |
-| TC_HS_03 | Boundary min: slider cannot go below 0 | Move right 2× then left 3× | `#range` = **"0"** (hard minimum) | High |
+| Test Case ID | Scenario Description | Input Data / Actions | Expected Result | Severity/Priority | Testing Technique |
+| --- | --- | --- | --- | --- | --- |
+| test_tc1_slider_increments_correctly | Happy Path: Precision check | `send_keys(Keys.ARROW_RIGHT)` | Value increments by exactly 0.5. | High | **EP** |
+| test_tc2_slider_boundary_min | Happy Path: Bottom boundary | `send_keys(Keys.ARROW_LEFT)` x 15 | Slider value floor is 0. | Medium | **BVA** |
 
 ---
 
 ## Feature: Hovers
+Simulates hover-triggered visibility using `ActionChains` and JS style-overrides.
+> **File:** test_hovers.py
 
-> **File:** `test_hovers.py`
-
-| Test Case ID | Scenario Description | Input Data / Actions | Expected Result | Severity/Priority |
-| :--- | :--- | :--- | :--- | :--- |
-| TC_HV_01 | Hover over first user figure reveals caption | `ActionChains.move_to_element(figure[0])` | Caption H5 shows **"name: user1"** | Medium |
-| TC_HV_02 | Hover over second user figure reveals caption | `ActionChains.move_to_element(figure[1])` | Caption H5 shows **"name: user2"** | Medium |
-| TC_HV_03 | Hover over third user figure reveals caption | `ActionChains.move_to_element(figure[2])` | Caption H5 shows **"name: user3"** | Medium |
-
----
-
-## Feature: iFrame (TinyMCE Editor)
-
-> **File:** `test_iframe.py`
-
-| Test Case ID | Scenario Description | Input Data / Actions | Expected Result | Severity/Priority |
-| :--- | :--- | :--- | :--- | :--- |
-| TC_IF_01 | Switch into iframe, clear editor, type new text, switch out | `switch_to.frame("mce_0_ifr")` → `Ctrl+A` + `DELETE` → `send_keys("Standard Selenium Frame Input Test")` → `switch_to.default_content()` | Editor contains injected text; H3 on parent page contains *"An iFrame"* | High |
+| Test Case ID | Scenario Description | Input Data / Actions | Expected Result | Severity/Priority | Testing Technique |
+| --- | --- | --- | --- | --- | --- |
+| test_tc1_hover_user1 | Happy Path: Caption trigger | `move_to_element(fig[0])`, inject opacity | Caption header displays "name: user1". | High | **State Transition** |
 
 ---
 
 ## Feature: Infinite Scroll
+Tests dynamic DOM expansion via AJAX-triggered scroll events.
+> **File:** test_infinite_scroll.py
 
-> **File:** `test_infinite_scroll.py`
-
-| Test Case ID | Scenario Description | Input Data / Actions | Expected Result | Severity/Priority |
-| :--- | :--- | :--- | :--- | :--- |
-| TC_IS_01 | Verify at least one content paragraph loads without scrolling | Navigate to page; count `.jscroll-added` elements | Count ≥ **1** on initial load | Medium |
-| TC_IS_02 | Scroll to bottom 3× and verify new content chunks are injected | `window.scrollTo(0, scrollHeight)` × 3; wait for count increase each time | Final paragraph count > initial count (dynamic injection confirmed) | High |
+| Test Case ID | Scenario Description | Input Data / Actions | Expected Result | Severity/Priority | Testing Technique |
+| --- | --- | --- | --- | --- | --- |
+| test_tc1_initial_content_load | Happy Path: Initial state | `presence_of_element_located(".jscroll-added")` | At least 1 block exists on page lead. | Low | **EP** |
+| test_tc2_scroll_loads_more_content | Happy Path: Content growth | `scrollTo(0, scrollHeight)` loop 3 times | Paragraph count increases vs initial state. | High | **State Transition** |
 
 ---
 
 ## Feature: Number Inputs
+Validates HTML5 number input constraints and arrow-key behaviors.
+> **File:** test_inputs.py
 
-> **File:** `test_inputs.py`
+| Test Case ID | Scenario Description | Input Data / Actions | Expected Result | Severity/Priority | Testing Technique |
+| --- | --- | --- | --- | --- | --- |
+| test_tc1_valid_number_input | Happy Path: Numeric acceptance | `send_keys("500")`, then "-35" | Value attribute reflects input correctly. | High | **EP** |
+| test_tc2_arrow_up_increment | Happy Path: Keyboard control | Input "10", `send_keys(Keys.ARROW_UP)` | Value increments to "11". | Medium | **State Transition** |
+| test_tc3_arrow_down_decrement | Happy Path: Keyboard control | Input "10", `send_keys(Keys.ARROW_DOWN)` | Value decrements to "9". | Medium | **State Transition** |
+| test_tc4_invalid_text_input | Sad Path: Type mismatch | `send_keys("abc")` | Value attribute remains empty (""). | High | **BVA** |
 
-| Test Case ID | Scenario Description | Input Data / Actions | Expected Result | Severity/Priority |
-| :--- | :--- | :--- | :--- | :--- |
-| TC_IN_01 | Valid positive and negative integers accepted | `send_keys("500")` then `send_keys("-35")` | Field value correctly reflects `"500"` then `"-35"` | Medium |
-| TC_IN_02 | ARROW_UP increments by 1 | Seed `"10"` → press `ARROW_UP` | Field value = **"11"** | Medium |
-| TC_IN_03 | ARROW_DOWN decrements by 1 | Seed `"10"` → press `ARROW_DOWN` | Field value = **"9"** | Medium |
-| TC_IN_04 | **Negative:** Alphabetic characters are rejected by `input[type=number]` | `send_keys("abc")` | Field value = **""** (browser blocks non-numeric input) | Medium |
+---
+
+## Feature: JavaScript Error
+Detects and logs client-side execution errors on page load.
+> **File:** test_javascript_error.py
+
+| Test Case ID | Scenario Description | Input Data / Actions | Expected Result | Severity/Priority | Testing Technique |
+| --- | --- | --- | --- | --- | --- |
+| test_javascript_error_page_loads_tc1 | Happy Path: Error page load | `get(URL)`, wait for `body p` | Title is "Page with JavaScript errors on load". | High | **EP** |
+| test_javascript_error_detection_tc2 | Sad Path: JS Error catch | `execute_script("return window.JSErrorOccurred;")` | Returns True (JS script failed on load). | Critical | **Negative Testing** |
+
+---
+
+## Feature: JQuery UI Menus
+Validates complex nested navigation with headless hover workarounds.
+> **File:** test_jquery_ui_menus.py
+
+| Test Case ID | Scenario Description | Input Data / Actions | Expected Result | Severity/Priority | Testing Technique |
+| --- | --- | --- | --- | --- | --- |
+| test_jquery_menu_enabled_pdf_tc1 | Happy Path: Nested navigation | Inject `display:block`, click PDF | File download initiated/navigated. | High | **State Transition** |
+| test_jquery_menu_disabled_not_clickable_tc3 | Sad Path: Disabled item | Locate 'Disabled' LI | Has class `ui-state-disabled`; not interactable. | Medium | **Negative Testing** |
+| test_jquery_menu_disabled_no_submenu_tc4 | Sad Path: Hidden sub-menu | Locate child `<ul>` of 'Disabled' item | Child `<ul>` exists but `is_displayed()` is False. | High | **BVA** |
 
 ---
 
 ## Feature: JS Alerts
+Handles browser-native Modal, Confirm, and Prompt dialogs.
+> **File:** test_js_alerts.py
 
-> **File:** `test_js_alerts.py`
-
-| Test Case ID | Scenario Description | Input Data / Actions | Expected Result | Severity/Priority |
-| :--- | :--- | :--- | :--- | :--- |
-| TC_JA_01 | Accept standard JS Alert and verify result | Click Alert button → `alert.accept()` | `#result` = *"You successfully clicked an alert"* | High |
-| TC_JA_02 | Accept JS Confirmation dialog | Click Confirm button → `alert.accept()` | `#result` = *"You clicked: Ok"* | High |
-| TC_JA_03 | **Negative:** Dismiss (Cancel) JS Confirmation dialog | Click Confirm button → `alert.dismiss()` | `#result` = *"You clicked: Cancel"* | Medium |
-
----
-
-## Feature: JS Prompt
-
-> **File:** `test_js_prompt.py`
-
-| Test Case ID | Scenario Description | Input Data / Actions | Expected Result | Severity/Priority |
-| :--- | :--- | :--- | :--- | :--- |
-| TC_JP_01 | **Security:** Inject XSS payload into JS prompt and verify safe reflection | Input: `<script>alert('XSS')</script>` → Accept | `#result` = *"You entered: \<script\>alert('XSS')\</script\>"* (string reflected safely, not executed) | CRITICAL |
-| TC_JP_02 | **Negative:** Dismiss prompt without input | Open prompt → `alert.dismiss()` | `#result` = *"You entered: null"* | Medium |
+| Test Case ID | Scenario Description | Input Data / Actions | Expected Result | Severity/Priority | Testing Technique |
+| --- | --- | --- | --- | --- | --- |
+| test_tc1_accept_js_alert | Happy Path: Accept Alert | Click `jsAlert()`, `alert.accept()` | #result shows "You successfully clicked...". | High | **State Transition** |
+| test_tc2_accept_js_confirm | Happy Path: Accept Confirm | Click `jsConfirm()`, `alert.accept()` | #result shows "You clicked: Ok". | High | **State Transition** |
+| test_tc3_dismiss_js_confirm | Sad Path: Dismiss Confirm | Click `jsConfirm()`, `alert.dismiss()` | #result shows "You clicked: Cancel". | Medium | **State Transition** |
 
 ---
 
 ## Feature: Key Presses
+Validates the mapping of browser-reflected keyboard events.
+> **File:** test_key_presses.py
 
-> **File:** `test_key_presses.py`
+| Test Case ID | Scenario Description | Input Data / Actions | Expected Result | Severity/Priority | Testing Technique |
+| --- | --- | --- | --- | --- | --- |
+| test_tc1_special_keyboard_keys | Happy Path: Logic keys | Send SPACE, ENTER, TAB, ESCAPE | Result echoes correct key name. | High | **EP** |
+| test_tc2_alphanumeric_keyboard_keys | Happy Path: Alphanumeric | Send "a", "Z", "7" | Result echoes uppercase char/mapped name. | Medium | **EP** |
 
-| Test Case ID | Scenario Description | Input Data / Actions | Expected Result | Severity/Priority |
-| :--- | :--- | :--- | :--- | :--- |
-| TC_KP_01 | Special/non-printable keyboard keys are detected and named correctly | Payloads: `SPACE`, `ENTER`, `TAB`, `ESCAPE`, `BACKSPACE`, `ALT` | Each `#result` matches the expected uppercase key name (e.g., *"You entered: SPACE"*) | High |
-| TC_KP_02 | Alphanumeric keys are reflected with correct uppercase/label mapping | Payloads: `"a"→A`, `"Z"→Z`, `"7"→7`, `"@"→COMMERCIAL_AT` | Each `#result` accurately maps to the expected uppercase label | Medium |
+---
+
+## Feature: Large & Deep DOM
+Tests for performance and selector reliability in massive DOM trees.
+> **File:** test_large_deep_dom.py
+
+| Test Case ID | Scenario Description | Input Data / Actions | Expected Result | Severity/Priority | Testing Technique |
+| --- | --- | --- | --- | --- | --- |
+| test_large_dom_deep_element_tc1 | Happy Path: Deep nesting | `find_element(By.ID, "no-siblings")` | Element is present (100+ nested DIVs). | High | **EP** |
+| test_large_dom_boundary_cell_tc2 | Happy Path: BVA grid check | Discover `sibling-N.M` IDs via JS | Largest boundary ID is correctly identified. | Medium | **BVA** |
+| test_large_dom_invalid_id_sad_path_tc3 | Sad Path: Missing element | Wait for `#large-999-999` | `TimeoutException` is caught. | Low | **Negative Testing** |
+
+---
+
+## Feature: Multiple Windows
+Tests browser tab management and handle-based context switching.
+> **File:** test_multiple_windows.py
+
+| Test Case ID | Scenario Description | Input Data / Actions | Expected Result | Severity/Priority | Testing Technique |
+| --- | --- | --- | --- | --- | --- |
+| test_multiple_windows_switch_happy_path_tc1 | Happy Path: Switch to tab | Click link, switch to `window_handle[1]` | New window contains "New Window" text. | High | **DOM Traversal / Context Isolation** |
+| test_multiple_windows_isolation_sad_path_tc2 | Sad Path: Context boundary | Try access new tab without `switch_to` | `NoSuchElementException` is caught. | High | **DOM Traversal / Context Isolation** |
+| test_invalid_window_handle_sad_path_tc3 | Sad Path: Ghost handle | `switch_to.window("ghost_tab_999")` | `NoSuchWindowException` is caught. | Medium | **Negative Testing** |
+
+---
+
+## Feature: Nested Frames
+Validates multi-level DOM frame traversal and sibling isolation.
+> **File:** test_nested_frames.py
+
+| Test Case ID | Scenario Description | Input Data / Actions | Expected Result | Severity/Priority | Testing Technique |
+| --- | --- | --- | --- | --- | --- |
+| test_nested_frames_top_traversal_tc1 | Happy Path: Deep traversal | `frame-top` -> `frame-left/middle/right` | Each frame contains its specific label text. | High | **DOM Traversal / Context Isolation** |
+| test_nested_frames_bottom_traversal_tc2 | Happy Path: Root traversal | `default_content()` -> `frame-bottom` | Bottom frame reflects "BOTTOM" text. | High | **DOM Traversal / Context Isolation** |
+| test_nested_frames_sibling_isolation_tc3 | Sad Path: Illegal jump | While in `left`, jump directly to `right` | `NoSuchFrameException` is caught. | High | **DOM Traversal / Context Isolation** |
+
+---
+
+## Feature: Notification Messages
+Validates flash alerts with resilience to server-side typos.
+> **File:** test_notification_messages.py
+
+| Test Case ID | Scenario Description | Input Data / Actions | Expected Result | Severity/Priority | Testing Technique |
+| --- | --- | --- | --- | --- | --- |
+| test_notification_click_success_tc1 | Happy Path: Trigger message | Click "Click here", wait for #flash | Flash message text contains 'Action'. | High | **EP** |
+| test_notification_message_typo_resilience_tc3 | Robustness: Typo handling | Scan message vs. `VALID_MESSAGES` set | Matches either "successful" or typo variant. | High | **BVA** |
+
+---
+
+## Feature: Redirect Link
+Verifies HTTP redirect chain tracking from origin to destination.
+> **File:** test_redirect_link.py
+
+| Test Case ID | Scenario Description | Input Data / Actions | Expected Result | Severity/Priority | Testing Technique |
+| --- | --- | --- | --- | --- | --- |
+| test_redirect_link_url_change_tc1 | Happy Path: URL transition | Click `a[href='redirect']` | URL contains "status_codes". | Critical | **EP** |
+| test_redirect_invalid_endpoint_tc3 | Sad Path: Direct invalid navigation | `get("/redirect/nonexistent")` | Landing page does NOT contain "Status Codes". | Medium | **Negative Testing** |
+| test_redirect_link_absent_on_wrong_page_tc4 | Sad Path: Reverse context check | Load `/status_codes` directly | Redirect link is correctly absent. | Low | **Negative Testing** |
+
+---
+
+## Feature: Secure File Download
+Validates authentication-protected resource access.
+> **File:** test_secure_file_download.py
+
+| Test Case ID | Scenario Description | Input Data / Actions | Expected Result | Severity/Priority | Testing Technique |
+| --- | --- | --- | --- | --- | --- |
+| test_secure_download_auth_happy_path_tc1 | Happy Path: Auth bypass | Embed `admin:admin` in URL | Secure file links become visible in DOM. | High | **EP** |
+| test_secure_download_unauth_sad_path_tc2 | Sad Path: Unauth access | Navigate WITHOUT credentials | `TimeoutException` caught (access denied). | High | **Negative Testing** |
+
+---
+
+## Feature: Shadow DOM
+Tests for shadow-boundary penetration techniques.
+> **File:** test_shadow_dom.py
+
+| Test Case ID | Scenario Description | Input Data / Actions | Expected Result | Severity/Priority | Testing Technique |
+| --- | --- | --- | --- | --- | --- |
+| test_shadow_dom_access_via_shadow_root_tc1 | Happy Path: Selenium 4 piercing | `shadow_host.shadow_root.find_element()` | Inner shadow text is retrieved. | High | **DOM Traversal / Context Isolation** |
+| test_shadow_dom_access_via_js_tc2 | Happy Path: JS piercing | `querySelector('host').shadowRoot` | JS retrieves content across boundary. | High | **DOM Traversal / Context Isolation** |
+| test_shadow_dom_xpath_cannot_pierce_tc3 | Sad Path: Encapsulation check | Global XPath search for inner element | `TimeoutException` (shadow DOM is opaque). | Medium | **Negative Testing** |
 
 ---
 
 ## Feature: Shifting Content
+Validates layout stability and DOM presence during CSS animations.
+> **File:** test_shifting_content.py
 
-> **File:** `test_shifting_content.py`
+| Test Case ID | Scenario Description | Input Data / Actions | Expected Result | Severity/Priority | Testing Technique |
+| --- | --- | --- | --- | --- | --- |
+| test_tc1_menu_renders_successfully_despite_shifting | Happy Path: Animation resilience | Wait for menu items, verify enabled | At least 5 menu items load and are clickable. | High | **State Transition** |
 
-| Test Case ID | Scenario Description | Input Data / Actions | Expected Result | Severity/Priority |
-| :--- | :--- | :--- | :--- | :--- |
-| TC_SC_01 | Verify menu element pixel coordinates shift deterministically between base and forced-shift URLs | Load base URL → capture `location`; load `?mode=random&pixel_shift=100` → recapture | Absolute difference in X or Y > **10 pixels** | Medium |
+---
+
+## Feature: Slow Resources
+Verifies handling of high-latency resource loading.
+> **File:** test_slow_resources.py
+
+| Test Case ID | Scenario Description | Input Data / Actions | Expected Result | Severity/Priority | Testing Technique |
+| --- | --- | --- | --- | --- | --- |
+| test_slow_resources_full_load_tc1 | Happy Path: Generous timing | `WebDriverWait(30)` for heading | Heading eventually becomes visible. | High | **BVA** |
+| test_slow_resources_perf_entry_exists_tc2 | Happy Path: API audit | Check `window.performance` | Entry exists; duration > 0ms. | Medium | **EP** |
+| test_slow_resources_short_timeout_bva_tc2_retry | Sad Path: BVA timeout | Wait with 1s timeout | `TimeoutException` is caught immediately. | High | **BVA** |
+
+---
+
+## Feature: Sortable Data Tables
+Validates dynamic sorting algorithms on complex tabular data.
+> **File:** test_sortable_data_tables.py
+
+| Test Case ID | Scenario Description | Input Data / Actions | Expected Result | Severity/Priority | Testing Technique |
+| --- | --- | --- | --- | --- | --- |
+| test_sortable_tables_sort_lastname_asc_tc1 | Happy Path: ASC sort | Click header once, extract column | Column matches `sorted()` order. | High | **EP** |
+| test_sortable_tables_sort_lastname_desc_tc2 | Happy Path: DESC sort | Click header twice | Column matches `sorted(reverse=True)`. | High | **EP** |
+| test_sortable_tables_out_of_bounds_column_tc4 | Sad Path: Index safety | Attempt to extract column 99 | Returns empty list gracefully. | Low | **BVA** |
 
 ---
 
 ## Feature: Status Codes
+Verifies page response handlers for various HTTP return states.
+> **File:** test_status_codes.py
 
-> **File:** `test_status_codes.py`
-
-| Test Case ID | Scenario Description | Input Data / Actions | Expected Result | Severity/Priority |
-| :--- | :--- | :--- | :--- | :--- |
-| TC_SC_01 | Verify 200 OK routing and response message | Click "200" link | Page text contains: *"This page returned a 200 status code."* | High |
-| TC_SC_02 | Verify 301 Moved Permanently routing | Click "301" link | Page text contains: *"This page returned a 301 status code."* | High |
-| TC_SC_03 | Verify 404 Not Found routing | Click "404" link | Page text contains: *"This page returned a 404 status code."* | High |
-| TC_SC_04 | Verify 500 Internal Server Error routing | Click "500" link | Page text contains: *"This page returned a 500 status code."* | High |
+| Test Case ID | Scenario Description | Input Data / Actions | Expected Result | Severity/Priority | Testing Technique |
+| --- | --- | --- | --- | --- | --- |
+| test_tc1_status_code_200_ok | Happy Path: HTTP 200 | Click "200" link | Body contains "page returned a 200". | High | **EP** |
+| test_tc4_status_code_500_server_error | Happy Path: HTTP 500 | Click "500" link | Body contains "page returned a 500". | High | **EP** |
 
 ---
 
-## Appendix: Test ID Prefix Reference
+## Feature: Typos
+Analyzes random typographical variances using probabilistic auditing.
+> **File:** test_typos.py
 
-| Prefix | Feature |
-| :--- | :--- |
-| `TC_ARE` | Add / Remove Elements |
-| `TC_BA` | Basic Authentication |
-| `TC_BI` | Broken Images |
-| `TC_CB` | Checkboxes |
-| `TC_CM` | Context Menu |
-| `TC_DE` | Disappearing Elements |
-| `TC_DD` | Drag and Drop / Dropdown |
-| `TC_DC` | Dynamic Content |
-| `TC_DY` | Dynamic Controls |
-| `TC_EA` | Entry Ad |
-| `TC_FD` | File Download |
-| `TC_FU` | File Upload |
-| `TC_FM` | Floating Menu |
-| `TC_FP` | Forgot Password |
-| `TC_FA` | Form Authentication |
-| `TC_GEO` | Geolocation |
-| `TC_HS` | Horizontal Slider |
-| `TC_HV` | Hovers |
-| `TC_IF` | iFrame |
-| `TC_IS` | Infinite Scroll |
-| `TC_IN` | Number Inputs |
-| `TC_JA` | JS Alerts |
-| `TC_JP` | JS Prompt |
-| `TC_KP` | Key Presses |
-| `TC_SC` | Shifting Content / Status Codes |
+| Test Case ID | Scenario Description | Input Data / Actions | Expected Result | Severity/Priority | Testing Technique |
+| --- | --- | --- | --- | --- | --- |
+| test_typos_refresh_until_correct_tc1 | Happy Path: Variance audit | Refresh until "won't" found (max 10) | Correct spelling eventually appears. | Low | **BVA** |
+| test_typos_detect_known_typo_tc2 | Happy Path: Bug classification | Audit for "won,t" | Known defect identified/logged as A/B variant. | Medium | **EP** |
+| test_typos_page_structure_robustness_tc3 | Happy Path: Layout consistency | Count `<p>` tags across variations | Always exactly 2 paragraphs in .example. | Medium | **BVA** |
+
+---
+
+## Feature: WYSIWYG Editor (TinyMCE)
+Validates rich-text editor functionality with read-only bypass techniques.
+> **File:** test_wysiwyg_editor.py
+
+| Test Case ID | Scenario Description | Input Data / Actions | Expected Result | Severity/Priority | Testing Technique |
+| --- | --- | --- | --- | --- | --- |
+| test_wysiwyg_js_injection_happy_path_tc1 | Happy Path: Read-only bypass | Inject HTML into #tinymce body | Payload appears despite warning overlay. | Critical | **State Transition** |
+| test_wysiwyg_readonly_alert_sad_path_tc2 | Sad Path: Warning detection | Check for `.tox-notification--warning` | Overlay present when API limit hit. | Medium | **BVA** |
+| test_wysiwyg_toolbar_visibility_happy_path_tc3 | Happy Path: Toolbar audit | Find Bold/Italic buttons via ARIA | Buttons are visible in primary document. | High | **EP** |
+| test_wysiwyg_context_isolation_sad_path_tc4 | Sad Path: Frame isolation | Enter iframe, search for toolbar | `NoSuchElementException` (buttons outside). | High | **DOM Traversal / Context Isolation** |

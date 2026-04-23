@@ -7,7 +7,7 @@ source venv/bin/activate
 pip install -r requirements.txt
 
 # Run 1 
-python3 [file]
+python3 run_single.py  [file]
 
 # Run sync 
 pytest tests/ -n auto --html=report.html --self-contained-html

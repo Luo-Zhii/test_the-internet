@@ -62,7 +62,6 @@ def patched_chrome_init(self, *args, **kwargs):
 webdriver.Chrome.__init__ = patched_chrome_init
 
 # --- PYTEST DYNAMIC PLUGIN (STABILIZATION & REPORTING) ---
-# --- PYTEST DYNAMIC PLUGIN (STABILIZATION & REPORTING) ---
 class ExecutionOptimizerPlugin:
     """Plugin to handle inter-test cooldowns and force log capture for HTML reports."""
     
@@ -94,6 +93,7 @@ class ExecutionOptimizerPlugin:
                     # Append the rescued logs as a distinct text block
                     extra.append(pytest_html.extras.text(full_log, name="Detailed Execution Logs"))
                     report.extra = extra
+
 # --- MAIN EXECUTION ---
 print("\n" + "="*45)
 print(" STARTING ROBUST MULTI-THREADED TEST SUITE ")
@@ -104,7 +104,6 @@ print("="*45)
 # --dist=loadfile: Ensures all tests in one file run on the same worker (state consistency)
 # --reruns 1: Auto-retry flaky tests once if they fail due to network jitter
 # --timeout 120: Hard-kill any test hanging longer than 2 minutes
-# --- MAIN EXECUTION ---
 exit_code = pytest.main([
     "tests/", 
     "-n", "4",
