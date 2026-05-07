@@ -49,7 +49,7 @@ pre_warm_driver()
 original_chrome_init = webdriver.Chrome.__init__
 def patched_chrome_init(self, *args, **kwargs):
     options = kwargs.get('options', Options())
-    options.add_argument('--headless=new')
+    # options.add_argument('--headless=new')
     options.add_argument('--window-size=1920,1080')
     options.add_argument('--disable-gpu')
     options.add_argument('--no-sandbox')
@@ -64,39 +64,68 @@ webdriver.Chrome.__init__ = patched_chrome_init
 class ExecutionOptimizerPlugin:
     def pytest_runtest_teardown(self, item, nextitem):
         """Micro-cooldown to release sockets."""
-        time.sleep(0.5) 
+        time.sleep(0.5)
 
     @pytest.hookimpl(hookwrapper=True)
     def pytest_runtest_makereport(self, item, call):
-        """Extract and attach console logs for PASSED tests into the HTML report."""
+        """Attach captured logs/stdout/stderr into pytest-html report."""
         outcome = yield
         report = outcome.get_result()
-        if report.when == "call" and report.passed:
-            log_sections = [f"=== {name.upper()} ===\n{content}" for name, content in report.sections]
-            full_log = "\n\n".join(log_sections)
-            if full_log.strip():
-                pytest_html = item.config.pluginmanager.getplugin("html")
-                if pytest_html:
-                    extra = getattr(report, "extra", [])
-                    extra.append(pytest_html.extras.text(full_log, name="Detailed Execution Logs"))
-                    report.extra = extra
 
+        # Chỉ attach sau khi test body chạy xong
+        if report.when != "call":
+            return
+
+        pytest_html = item.config.pluginmanager.getplugin("html")
+        if not pytest_html:
+            return
+
+        log_parts = []
+
+        log_parts.append(f"TEST CASE: {item.nodeid}")
+        log_parts.append(f"RESULT: {report.outcome.upper()}")
+        log_parts.append(f"DURATION: {report.duration:.2f}s")
+        log_parts.append("=" * 80)
+
+        if report.sections:
+            for name, content in report.sections:
+                if content.strip():
+                    log_parts.append(f"\n--- {name.upper()} ---\n")
+                    log_parts.append(content)
+
+        if hasattr(report, "longreprtext") and report.failed:
+            log_parts.append("\n--- FAILURE TRACEBACK ---\n")
+            log_parts.append(report.longreprtext)
+
+        full_log = "\n".join(log_parts)
+
+        extras = getattr(report, "extras", [])
+
+        # Link trong cột Links: bấm vào sẽ mở log dạng text
+        extras.append(
+            pytest_html.extras.text(
+                full_log,
+                name="Detailed Execution Logs"
+            )
+        )
+
+        report.extras = extras
 # --- 4. EXECUTION ---
 print("\n" + "="*60)
 print(f"🎯 TARGETING SINGLE TEST FILE: {target_file}")
 print("="*60)
 
 exit_code = pytest.main([
-    target_file,             # Target file passed from CLI
-    "-v",                    # Verbose output
-    "-s",                    # Print logs to console in real-time
-    f"--html={report_name}", # Export dedicated HTML report
+    target_file,
+    "-v",
+    "-s",
+    f"--html={report_name}",
     "--self-contained-html",
-    "--capture=tee-sys",     # Dual-stream: Console + HTML Report
+    "--capture=tee-sys",
+    "--show-capture=all",
     "--reruns", "1",
-    "--timeout", "60",       # 60s is safe for a single file execution
-    
-    # Standard Info Logging
+    "--timeout", "120",
+
     "--log-cli-level=INFO",
     "--log-level=INFO",
     "--log-format=%(asctime)s [%(levelname)s] %(message)s",

@@ -125,5 +125,38 @@ class TestChallengingDOM(unittest.TestCase):
         logger.info("Verification: Asserting URL contains '#delete'.")
         self.assertIn("#delete", self.driver.current_url, "Clicking 'delete' did not update the URL fragment correctly.")
         logger.info("Assertion passed.")
+
+    def test_tc8_dynamic_id_shift(self):
+        """
+        TC8_Dynamic_ID_Shift: Verify that button IDs actually change after a click.
+        Kiểm tra việc ID của các nút thực sự thay đổi sau khi click.
+        """
+        logger.info("Executing TC8: Checking Dynamic ID shifting - Thực thi TC8: Kiểm tra sự dịch chuyển ID động.")
+        
+        # Action: Locate the Blue button (The one without .alert or .success)
+        # Hành động: Tìm nút màu Xanh dương (Nút không chứa class .alert hoặc .success)
+        blue_btn_locator = (By.CSS_SELECTOR, ".button:not(.alert):not(.success)")
+        blue_btn = self.wait.until(EC.presence_of_element_located(blue_btn_locator))
+        
+        # Get the ID before clicking - Lấy ID trước khi click
+        old_id = blue_btn.get_attribute("id")
+        logger.info(f"Captured Old ID: '{old_id}' - Đã bắt được ID cũ: '{old_id}'")
+        
+        # Action: Click it - Hành động: Click vào nó
+        blue_btn.click()
+        
+        # CRITICAL: Wait for the old element to become STALE (DOM reloads)
+        # QUAN TRỌNG: Chờ cho phần tử cũ bị ôi thiu (DOM tải lại)
+        self.wait.until(EC.staleness_of(blue_btn))
+        
+        # Re-locate the button after reload - Tìm lại nút sau khi tải lại
+        blue_btn_new = self.wait.until(EC.presence_of_element_located(blue_btn_locator))
+        new_id = blue_btn_new.get_attribute("id")
+        logger.info(f"Captured New ID: '{new_id}' - Đã bắt được ID mới: '{new_id}'")
+        
+        # Expectation: The IDs must be different - Kỳ vọng: Các ID phải khác nhau
+        self.assertNotEqual(old_id, new_id, "FAILED: Button ID did not change after click! - LỖI: ID của nút không thay đổi sau khi click!")
+        logger.info("TC8 Assertion passed: Dynamic ID behavior verified.")
+        
 if __name__ == "__main__":
     unittest.main()

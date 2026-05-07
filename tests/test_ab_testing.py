@@ -101,5 +101,34 @@ class TestABTesting(unittest.TestCase):
         )
         logger.info("[OUTPUT] TC3 PASSED – Opt-out cookie successfully bypassed the A/B test variations.")
 
+    def test_ab_testing_reset_cookie_valid_variant_tc4(self):
+        logger.info("[INPUT] TC4 – Checking valid A/B variants after clearing cookies repeatedly.")
+
+        observed_headers = set()
+
+        for i in range(10):
+            logger.info(f"[INPUT] Attempt {i + 1}: navigate to page, clear cookies, reload.")
+
+            self.driver.get(BASE_URL)
+            self.driver.delete_all_cookies()
+            self.driver.refresh()
+
+            header = self.wait.until(
+                EC.visibility_of_element_located((By.TAG_NAME, "h3"))
+            )
+
+            text = header.text
+            observed_headers.add(text)
+
+            logger.info(f"[INPUT] Observed header text: '{text}'.")
+
+            self.assertIn(
+                text,
+                VALID_HEADERS,
+                f"Header '{text}' is not a recognized A/B variant."
+            )
+        logger.info(f"[OUTPUT] Observed headers after repeated cookie reset: {observed_headers}")
+        logger.info("[OUTPUT] TC4 PASSED – Page returns valid A/B header after cookie reset.")
+
 if __name__ == "__main__":
     unittest.main()
